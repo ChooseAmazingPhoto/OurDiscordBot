@@ -9,7 +9,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    print(f"? Bot ¤w¤W½u¡G{bot.user}")
+    print(f"Bot is online: {bot.user}")
 
 @bot.command()
 async def ping(ctx):
