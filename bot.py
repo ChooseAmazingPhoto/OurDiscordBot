@@ -1,4 +1,5 @@
 import os
+import sys
 
 import discord
 from discord.ext import commands
@@ -9,7 +10,8 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if TOKEN is None:
-    raise RuntimeError("Missing DISCORD_TOKEN environment variable")
+    sys.stderr.write("Missing DISCORD_TOKEN environment variable. Set it in your deployment settings or .env file.\n")
+    sys.exit(1)
 
 intents = discord.Intents.default()
 intents.message_content = True
