@@ -7,15 +7,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TOKEN = os.getenv("DISCORD_TOKEN")
+MISSING_TOKEN_MESSAGE = (
+    "Missing DISCORD_TOKEN environment variable. "
+    "Set it in your deployment settings or .env file."
+)
 
-if TOKEN is None:
-    sys.stderr.write("Missing DISCORD_TOKEN environment variable. Set it in your deployment settings or .env file.\n")
-    sys.exit(1)
+
+def get_token() -> str:
+    token = os.getenv("DISCORD_TOKEN")
+    if token is None:
+        raise RuntimeError(MISSING_TOKEN_MESSAGE)
+    return token
+
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
+
 
 @bot.event
 async def on_ready():
@@ -24,12 +32,27 @@ async def on_ready():
         bot.synced = True
     print(f"Bot is online: {bot.user}")
 
+
 @bot.command()
 async def ping(ctx):
     await ctx.send("pong!")
 
+
 @bot.tree.command(name="hello", description="Say hello with a slash command")
 async def hello(interaction: discord.Interaction):
-    await interaction.response.send_message(f"Hello, {interaction.user.mention}!")
+    greeting = f"Hello, {interaction.user.mention}!"
+    await interaction.response.send_message(greeting)
 
-bot.run(TOKEN)
+
+def main() -> None:
+    try:
+        token = get_token()
+    except RuntimeError as exc:
+        sys.stderr.write(f"{exc}\n")
+        sys.exit(1)
+
+    bot.run(token)
+
+
+if __name__ == "__main__":
+    main()
