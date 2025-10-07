@@ -9,7 +9,7 @@
 ## 必填內容
 - 	ype：從下方允許的前綴中擇一。
 - optional-scope：簡短的範圍描述。若不需要則整段（含括號）省略。
-- DCBOT-<ticket>：對應工作項目的編號。以實際票號取代 <ticket>，只有在沒有追蹤票證時才可使用 DCBOT-0。
+- DCBOT-<ticket>：對應工作項目的編號。以實際票號取代 <ticket>。
 - short summary：50 個字元以內的簡短敘述，使用祈使語氣或片語開頭的小寫句子。
 
 ## 可用 type
