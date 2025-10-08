@@ -24,10 +24,12 @@ JIRA_WEBHOOK_SECRET = os.getenv("JIRA_WEBHOOK_SECRET")
 
 # --- Webhook Handling ---
 
+
 @app.route("/health")
 def health_check():
     """A simple health check endpoint to verify the server is running."""
     return "OK", 200
+
 
 @app.route("/webhooks/jira", methods=["POST"])
 def jira_webhook():
@@ -40,7 +42,7 @@ def jira_webhook():
         abort(403)
 
     data = request.get_json()
-    
+
     # Pass the data to the handler for processing into an embed
     embed = process_jira_event(data)
 
@@ -49,6 +51,7 @@ def jira_webhook():
         send_discord_message(embed=embed)
 
     return "OK", 200
+
 
 def send_discord_message(content=None, embed=None):
     """
@@ -62,15 +65,23 @@ def send_discord_message(content=None, embed=None):
         channel_id = int(DISCORD_CHANNEL_ID)
         channel = bot.get_channel(channel_id)
         if channel:
-            asyncio.run_coroutine_threadsafe(channel.send(content=content, embed=embed), bot.loop)
+            asyncio.run_coroutine_threadsafe(
+                channel.send(content=content, embed=embed), bot.loop
+            )
         else:
-            print(f"Error: Cannot find channel with ID {channel_id}. Make sure the bot is in that channel.")
+            print(
+                f"Error: Cannot find channel with ID {channel_id}. Make sure the bot is in that channel."
+            )
     except (ValueError, TypeError):
-        print(f"Error: DISCORD_CHANNEL_ID '{DISCORD_CHANNEL_ID}' is not a valid integer.")
+        print(
+            f"Error: DISCORD_CHANNEL_ID '{DISCORD_CHANNEL_ID}' is not a valid integer."
+        )
     except Exception as e:
         print(f"An unexpected error occurred when sending to Discord: {e}")
 
+
 # --- Bot Commands and Events ---
+
 
 @bot.event
 async def on_ready():
@@ -78,16 +89,17 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
     print(f"Ready to send notifications to channel ID: {DISCORD_CHANNEL_ID}")
 
+
 @bot.event
 async def on_message(message):
     """Event handler for when a message is sent to a channel."""
     if message.author == bot.user:
         return
 
-    if message.content.startswith('!health'):
+    if message.content.startswith("!health"):
         port = int(os.environ.get("PORT", 8080))
         url = f"http://localhost:{port}/health"
-        
+
         response_text = ""
         try:
             async with aiohttp.ClientSession() as session:
@@ -103,16 +115,21 @@ async def on_message(message):
         except aiohttp.ClientError as e:
             response_text = f":x: **Web Server Status: Unreachable**\nCould not connect to `{url}`. The server might be down.\n`{e}`"
         except Exception as e:
-            response_text = f":x: **An unexpected error occurred during health check:**\n`{e}`"
-            
+            response_text = (
+                f":x: **An unexpected error occurred during health check:**\n`{e}`"
+            )
+
         await message.channel.send(response_text)
 
+
 # --- Service Execution ---
+
 
 def run_flask():
     """Runs the Flask app in a separate thread."""
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 if __name__ == "__main__":
     if not all([DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID, JIRA_WEBHOOK_SECRET]):
