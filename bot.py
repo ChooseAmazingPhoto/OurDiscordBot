@@ -64,7 +64,9 @@ def jira_webhook():
 
     # 3. Process event
     if data and "issue" in data:
-        logging.info(f"Processing Jira event for issue: {data.get('issue', {}).get('key')}")
+        logging.info(
+            f"Processing Jira event for issue: {data.get('issue', {}).get('key')}"
+        )
     else:
         logging.warning("Jira webhook payload did not contain issue data.")
 
