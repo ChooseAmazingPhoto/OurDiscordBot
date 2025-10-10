@@ -31,24 +31,51 @@ def health_check():
     return "OK", 200
 
 
+import logging
+
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
 @app.route("/webhooks/jira", methods=["POST"])
 def jira_webhook():
     """
     Receives webhook events from Jira, validates them, and passes them to a handler.
     """
+    # 1. Validate secret
     auth_token = request.args.get("secret")
     if not JIRA_WEBHOOK_SECRET or auth_token != JIRA_WEBHOOK_SECRET:
-        print(f"Aborting Jira webhook: Invalid secret. Provided: {auth_token}")
+        logging.warning(
+            f"Invalid secret provided for Jira webhook. Provided: {auth_token}"
+        )
         abort(403)
 
-    data = request.get_json()
+    # 2. Log raw data and parse JSON
+    raw_data = request.get_data(as_text=True)
+    logging.info(f"Received Jira webhook payload: {raw_data}")
 
-    # Pass the data to the handler for processing into an embed
+    try:
+        data = request.get_json()
+    except Exception as e:
+        logging.error(f"Failed to parse JSON from Jira webhook: {e}")
+        abort(400, description="Could not parse JSON payload.")
+
+    # 3. Process event
+    if data and "issue" in data:
+        logging.info(
+            f"Processing Jira event for issue: {data.get('issue', {}).get('key')}"
+        )
+    else:
+        logging.warning("Jira webhook payload did not contain issue data.")
+
     embed = process_jira_event(data)
 
-    # If the handler returns a valid embed object, send it to Discord
+    # 4. Send to Discord
     if isinstance(embed, discord.Embed):
         send_discord_message(embed=embed)
+        logging.info("Successfully sent Jira notification to Discord.")
 
     return "OK", 200
 

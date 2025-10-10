@@ -1,76 +1,102 @@
-﻿# Jira 自動化 × Discord Bot 整合計畫
+# Jira × Discord 整合指南
 
 ## 專案目標
-- 讓 Jira Automation 的 `Send web request` 觸發後自動推播至指定 Discord 頻道。
-- 建立即時且可追溯的通知流程，以加速團隊掌握需求與異動。
-- 維持可維護的 API 介面，便於後續擴充與跨專案重用。
+- **即時通知**：當 Jira 中的議題發生特定事件（如建立、更新、狀態變更）時，自動發送通知到指定的 Discord 頻道。
+- **簡化流程**：取代手動複製貼上連結的繁瑣工作，讓團隊成員能即時掌握專案動態。
+- **資訊清晰**：提供格式化且包含關鍵資訊（議題標題、狀態、負責人、連結等）的 Discord 通知。
 
-## 系統流程概觀
-1. Jira Automation 規則被觸發（例如議題建立、狀態轉換、欄位變更）。
-2. Jira 透過 HTTPS POST 呼叫 Discord Bot 提供的 `/jira/notify` API。
-3. Bot 端驗證請求、解析載荷並格式化 Discord 訊息。
-4. Bot 使用 Discord API 將通知送至目標頻道，並回傳成功狀態給 Jira。
-
-## Bot 端實作重點
-- **Webhook 端點**：在現有服務或新建的輕量伺服器上新增 `/jira/notify` POST 路由，接收 JSON 載荷。
-- **驗證與安全**：實作 Bearer Token 或自訂簽章檢查，拒絕未授權來源；必要時導入 Jira IP 白名單。
-- **訊息格式器**：定義標準化訊息模板（包含議題 Key、摘要、狀態、觸發人、連結等），支援進一步的事件型態分支。
-- **錯誤處理與紀錄**：記錄請求與發送結果，針對 Discord API 速率限制實作退避策略，並在失敗時回報 Jira。
+## 系統流程
+1. **Jira 事件觸發**：使用者在 Jira 上執行操作，觸發預先設定好的 Automation 規則。
+2. **Webhook 請求**：Jira Automation 向部署在 Railway 上的 Discord Bot 發送一個 HTTPS POST 請求。
+3. **Bot 驗證與處理**：Bot 驗證請求來源的合法性，解析收到的 JSON 資料，並將其轉換為 Discord Embed 格式。
+4. **發送 Discord 通知**：Bot 將格式化後的訊息發送到指定的 Discord 頻道。
 
 ## 環境變數設定
-- `DISCORD_TOKEN`：Discord Bot Token。
-- `DISCORD_JIRA_CHANNEL_ID`：要推播訊息的 Discord 文字頻道 ID（整數）。
-- `JIRA_WEBHOOK_TOKEN`：Jira Automation 呼叫時需附帶的 Bearer Token，共享密鑰。
-- `JIRA_WEB_SERVER_HOST`（選填，預設 `0.0.0.0`）：Webhook 伺服器綁定位址。
-- `JIRA_WEB_SERVER_PORT`（選填，預設 `8080`）：Webhook 伺服器監聽埠號。
-- `LOG_LEVEL`（選填，預設 `INFO`）：調整應用程式執行時的日誌層級。
+為了讓 Bot 正常運作，你需要在 Railway 的服務設定中填寫以下環境變數：
 
-在本機開發時，可將上述設定寫入 `.env` 檔案；部署時請使用平台提供的密鑰管理機制。
+| 變數名稱              | 說明                                     | 範例                               |
+| --------------------- | ---------------------------------------- | ---------------------------------- |
+| `DISCORD_BOT_TOKEN`   | 你的 Discord Bot Token。                 | `MTA4...`                          |
+| `DISCORD_CHANNEL_ID`  | 要接收通知的 Discord 文字頻道 ID。       | `123456789012345678`               |
+| `JIRA_WEBHOOK_SECRET` | 用於驗證 Jira 請求的自訂密鑰。           | `a-very-secret-string`             |
+
+**注意**：部署時請使用 Railway 平台提供的密鑰管理機制，不要將敏感資訊寫死在程式碼中。
+
+## Railway 設定
+1. **取得公開網址**：在你的 Railway 專案中，為此服務新增一個 **Public Networking**。
+   - 選擇 **Generate Domain** 來產生一個免費的 `*.up.railway.app` 網域。
+   - 這個網址就是你的服務對外的公開 URL，例如：`https://our-discord-bot-production.up.railway.app`。
+
+2. **組合 Webhook URL**：Jira 需要的 Webhook URL 格式如下：
+   `https://<你的 Railway 網址>/webhooks/jira?secret=<你的 JIRA_WEBHOOK_SECRET>`
+
+   例如：`https://our-discord-bot-production.up.railway.app/webhooks/jira?secret=a-very-secret-string`
 
 ## Jira Automation 設定步驟
-1. 在專案或全站層級新增規則，選擇適用的觸發條件（例如 Issue Created、Transitioned、Field Value Changed）。
-2. 視需要加入條件過濾（限定特定專案類型、狀態或標籤）。
-3. 新增「Send web request」動作，設定 Method=POST、URL=`https://<your-domain>/jira/notify`、Headers 加入 `Content-Type: application/json` 與授權標頭，Body 使用 smart values 組成 JSON，如下範例。
-```json
-{
-  "issueKey": "{{issue.key}}",
-  "summary": "{{issue.fields.summary}}",
-  "status": "{{issue.fields.status.name}}",
-  "event": "{{triggerIssueEvent}}",
-  "link": "{{issue.url}}",
-  "triggeredBy": "{{initiator.displayName}}",
-  "timestamp": "{{now}}"
-}
-```
-4. 啟用「Delay execution of subsequent rule actions until we get a response」以便檢視回應內容（必要時）。
-5. 在 Audit log 確認測試事件的回應狀態，依需求調整規則或載荷格式。
+1. 進入你的 Jira 專案，在「專案設定」 > 「自動化」中建立一個新的規則。
+2. **選擇觸發條件**：例如 `議題已建立` (Issue Created) 或 `議題狀態已變更` (Issue Transitioned)。
+3. **新增動作 (Action)**：選擇 `傳送 Web 要求` (Send web request)。
+4. **填寫 Webhook 詳細資訊**：
+   - **URL**：貼上你在 Railway 設定步驟中組合好的 **Webhook URL**。
+   - **方法 (Method)**：`POST`
+   - **標頭 (Headers)**：
+     - `Content-Type`: `application/json`
+   - **Webhook 本文 (Body)**：選擇 `自訂資料` (Custom data)，並使用 Smart Values 貼上你希望傳送的 JSON 內容。
 
-## 測試與驗證流程
-- 本地使用 `curl` 或 Postman 模擬 Jira 載荷，驗證端點與 Discord 推播是否正常。
-- 在 Jira 建立暫時性規則進行 QA，確認觸發條件與通知格式符合預期。
-- 觀察 Bot 與 Jira 的日誌，確保錯誤處理與重試行為符合設計。
+   **範例 JSON Body**：
+   ```json
+   {
+     "timestamp": "{{now.toIso8601}}",
+     "webhookEvent": "jira:issue_created",
+     "user": {
+       "displayName": "{{initiator.displayName}}"
+     },
+     "issue": {
+       "key": "{{issue.key}}",
+       "fields": {
+         "summary": "{{issue.summary}}",
+         "issuetype": {
+           "name": "{{issue.issueType.name}}"
+         },
+         "priority": {
+           "name": "{{issue.priority.name}}"
+         },
+         "status": {
+           "name": "{{issue.status.name}}"
+         }
+       }
+     },
+     "changelog": {
+       "items": {{changelog.items.json}}
+     }
+   }
+   ```
+5. **啟用規則**：儲存並啟用該規則。
 
-### `curl` 範例（以本機 8080 埠為例）
+## 測試與驗證
+- **本地測試**：你可以使用 `curl` 或 Postman 等工具模擬 Jira 發送請求，來測試本地運行的 Bot 是否能成功收到並處理。
+- **Jira 測試**：在 Jira 中手動觸發你設定的規則（例如，建立一個新議題），然後到指定的 Discord 頻道查看是否收到了預期的通知。
+- **查看日誌**：如果通知未出現，可以到 Railway 查看服務的運行日誌，你先前請我加入的 logging 會顯示收到的請求內容和任何錯誤訊息，這將有助於你排查問題。
+
+### `curl` 測試範例
+這個指令模擬 Jira 向你的 Bot 發送一個 Webhook 請求。請將 URL 換成你的服務網址。
+
 ```bash
+# 將 <YOUR_RAILWAY_URL> 和 <YOUR_SECRET> 換成你自己的設定
 curl -X POST \
-  http://localhost:8080/jira/notify \
-  -H "Authorization: Bearer <JIRA_WEBHOOK_TOKEN>" \
+  "https://<YOUR_RAILWAY_URL>/webhooks/jira?secret=<YOUR_SECRET>" \
   -H "Content-Type: application/json" \
-  -d '{
-        "issueKey": "PROJ-123",
-        "summary": "範例議題",
-        "status": "In Progress",
-        "event": "Issue updated",
-        "link": "https://jira.example.com/browse/PROJ-123",
-        "triggeredBy": "Alice",
-        "timestamp": "{{now}}"
+  -d 
+'{'
+        "issue": {
+          "key": "TEST-1",
+          "fields": {
+            "summary": "這是一個來自 curl 的測試議題",
+            "status": { "name": "To Do" }
+          }
+        },
+        "user": { "displayName": "Test User" }
       }'
 ```
 
-確保 Discord Bot 已登入並具有目標頻道的發言權限，否則通知將無法送達。
-
-## 後續維運建議
-- 定期輪替 API Token，並同步更新 Jira Automation 設定。
-- 視需求擴充訊息模板（例如加入 SLA、優先權、子任務統計）。
-- 將關鍵事件寫入監控或警示系統，以偵測通知失敗。
-- 撰寫回歸測試或自動檢查腳本，確保 Bot 端的 Discord 權限與頻道設定保持一致。
+如果一切設定正確，你的 Discord 頻道應該會收到一則關於 "TEST-1" 的通知。
