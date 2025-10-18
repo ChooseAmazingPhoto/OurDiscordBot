@@ -38,32 +38,49 @@ def test_jira_webhook_missing_secret(client):
     assert response.status_code == 403
 
 
-@patch("bot.send_discord_message")
-@patch("bot.process_jira_event")
-def test_jira_webhook_success_with_embed(mock_process_event, mock_send_message, client):
+@patch("bot.notifier.send")
+def test_jira_webhook_success_with_embed(mock_send_message, client):
     """Test a successful Jira webhook call that returns an embed."""
-    mock_embed = discord.Embed(title="Test Embed")
-    mock_process_event.return_value = mock_embed
+    payload = {
+        "webhookEvent": "jira:issue_created",
+        "issue": {
+            "self": "https://example.atlassian.net/rest/api/2/issue/12345",
+            "key": "DCBOT-99",
+            "fields": {
+                "summary": "A brand new issue",
+                "reporter": {"displayName": "Example Reporter"},
+                "issuetype": {"name": "Task"},
+                "priority": {"name": "Medium"},
+                "project": {"name": "Discord Bot"},
+            },
+        },
+    }
 
-    response = client.post("/webhooks/jira?secret=secret", json={"event": "test"})
+    response = client.post("/webhooks/jira?secret=secret", json=payload)
 
     assert response.status_code == 200
     assert response.data == b"OK"
-    mock_process_event.assert_called_once_with({"event": "test"})
-    mock_send_message.assert_called_once_with(embed=mock_embed)
+    mock_send_message.assert_called_once()
+    _, kwargs = mock_send_message.call_args
+    assert isinstance(kwargs["embed"], discord.Embed)
 
 
-@patch("bot.send_discord_message")
-@patch("bot.process_jira_event")
-def test_jira_webhook_success_no_embed(mock_process_event, mock_send_message, client):
+@patch("bot.notifier.send")
+def test_jira_webhook_success_no_embed(mock_send_message, client):
     """Test a successful Jira webhook call that does not return an embed."""
-    mock_process_event.return_value = None
+    payload = {
+        "webhookEvent": "jira:issue_deleted",
+        "issue": {
+            "self": "https://example.atlassian.net/rest/api/2/issue/12345",
+            "key": "DCBOT-99",
+            "fields": {"summary": "No longer valid"},
+        },
+    }
 
-    response = client.post("/webhooks/jira?secret=secret", json={"event": "unhandled"})
+    response = client.post("/webhooks/jira?secret=secret", json=payload)
 
     assert response.status_code == 200
     assert response.data == b"OK"
-    mock_process_event.assert_called_once_with({"event": "unhandled"})
     mock_send_message.assert_not_called()
 
 

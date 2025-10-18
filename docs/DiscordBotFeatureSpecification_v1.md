@@ -1,92 +1,36 @@
-# 概述
+# Discord Bot Feature Specification v1
 
-本文件列出 Discord Bot 的**功能規格**，適用於以 Discord 為協作中樞、整合 Jira、GitHub 與 CI/CD 等工具的團隊。
+This specification describes the high-level goals and current feature set of OurDiscordBot.
 
----
+## Vision
+Deliver actionable project context directly in Discord so that product, engineering, and operations teams can react without leaving the chat client.
 
-# 目標
+## Core Pillars
+1. **Notification Hub** - Broadcast relevant Jira events (issue creation, assignee changes, status transitions, upcoming due dates, comments).
+2. **Fast Context** - Embed summaries with priority, status, reporter, assignee, and labels. Provide direct links back to Jira for follow-up.
+3. **Operational Awareness** - Offer ad-hoc status checks through lightweight commands (currently `!health`, extendable to future queries).
+4. **Extensibility** - New events drop in through the registry+classifier pattern; no modification of core routing is required.
 
-* 在 Discord 完成跨工具的**通知、查詢、彙整、決策與觸發**。
-* 降低工具切換成本，建立單一訊息流。
-* 提升交付節奏、透明度與團隊同步效率。
+## Functional Scope
+| Area | Capabilities (v1) | Notes / Next Steps |
+| --- | --- | --- |
+| Jira Notifications | Issue created (implemented); assignee change (implemented); status transition (implemented); due date, labels, comments (stubs ready for implementation). | Prioritise finishing stub handlers and adding regression tests. |
+| Discord Commands | `!health` checks the webhook availability. | Evaluate need for slash commands once webhook coverage stabilises. |
+| Delivery | Single channel broadcast defined by `DISCORD_CHANNEL_ID`. | Future iteration: routing by project or priority. |
+| Templates | JSON samples stored under `jira_smart_templates/` for use with Jira Automation. | Assess runtime template rendering if non-engineering teammates will maintain messages. |
 
----  
+## Non-Goals (v1)
+- Multi-workspace sharding across numerous Discord guilds.
+- Persistent storage or analytics beyond Discord message history.
+- Automatic slash command sync (classic client only).
 
-# 功能總覽（索引）
+## Quality Requirements
+- Webhook authentication via shared secret.
+- Unit tests covering HTTP routes and event handlers.
+- Graceful handling of missing or malformed payload data (log and skip rather than crash).
 
-1. 通知與推播
-2. 指令與快速查詢（Jira/GitHub）
-3. 開發與交付（CI/CD / Release）與品質
-4. 訊息呈現與互動
-5. 歷程
-
----
-
-## 1) 通知與推播
-
-1.1 Jira 任務事件推播：Issue 新增、狀態轉移、指派變更、到期日變更、評論新增、重開、標籤變更。
-1.2 GitHub 事件推播：PR 開啟 / 更新 / 合併 / 關閉、Review 請求、Issue 新增 / 關閉、Release 發布、Tag 建立。
-1.3 CI/CD 狀態推播：工作觸發、佇列、成功、失敗、取消、重試結果、產物連結。
-
----
-
-## 2) 指令與快速查詢
-
-> 在 Discord 使用斜線指令或關鍵字觸發，立即回應結果。
-
-2.1 個人工作面板：查詢「指派給我且未完成」；支援依專案 / 優先級 / 到期排序與分頁。
-2.2 專案總覽：輸入專案代號回應未完成、進行中。
-2.3 嚴重問題清單：依優先級（或 Severity）回傳未解決 Bug 清單。
-2.4 逾期清單：列出已過到期日的任務，含天數與指派人。
-2.5 Issue / PR 快速查：輸入 Key（如 PROJ-123）或 PR 編號，回傳標題、狀態、指派、最後更新、連結。
-2.6 團隊 / 個人進度：輸入 @成員 或 all，彙整各自當週進度與重點待辦。
-
----
-
-## 3) 開發與交付（CI/CD / Release）與品質
-
-3.1 Pipeline 狀態回報：每次觸發、完成、失敗、重試皆推送摘要與詳細頁連結。
-3.2 環境板塊摘要：各環境（dev / staging / prod）最近部署時間、版本、主要變更摘要。
-3.3 版本發佈摘要：新版本號、變更重點、相依套件重大更新、回退指示（文字摘要層級）。
-3.4 部署視窗公告：部署凍結期間公告與解除公告。
-3.5 合規檢核結果回報：安全掃描 / 授權掃描 / 測試覆蓋率門檻是否通過之摘要。
-3.6 品質：貼出重複碼、脆弱度、Lint 熱點、覆蓋率趨勢。
-
----
-
-## 4) 訊息呈現與互動
-
-4.1 訊息卡片：標題、重點欄位、狀態標籤、逾期 / 優先級徽記、快速操作按鈕。
-4.2 分頁與展開：結果超過 N 筆時分頁；支援展開 / 收合詳情與載入更多。
-4.3 快速動作：在回應卡片上執行指派、標籤、加入追蹤清單、延後提醒等操作（僅限允許的範圍）。
-4.4 可追溯連結：所有項目均附外部系統連結方便跳轉。
-
----
-
-## 5) 歷程
-
-5.1 操作歷程：記錄 Bot 回應與關鍵操作摘要供管理者查閱。
-
----
-
-# 依工具的功能細分
-
-## Jira
-
-* 事件推播：新增、更新、轉移、指派、評論、到期。
-* 快速查詢：我的任務、專案概況、嚴重問題、逾期、Sprint 概況、關鍵字搜尋、近期變更。
-* 產出：每週專案摘要、技術債趨勢摘要。
-* 待辦：從查詢結果加到追蹤清單；到期提醒、延後、完成同步。
-
-## GitHub
-
-* 事件推播：Issue、PR、Review、Merge、Release、Tag。
-* 查詢：PR / Issue 詳情、標籤。
-
-## CI/CD（GitHub Actions）
-
-* 狀態推播：觸發 / 成功 / 失敗 / 重試、Artifact 連結。
-* 環境視圖：各環境最近部署版本與變更摘要。
-* 變更視圖：與版本 / Changelog 串接的發布摘要推送。
-
----
+## Roadmap Ideas
+1. Finalise handlers for due-date updates, comments, and labels.
+2. Introduce structured logging / Sentry for error visibility in production.
+3. Add slash commands for querying assignee workload or outstanding blockers.
+4. Support pluggable notification sinks (e.g., other Discord channels or email digests).

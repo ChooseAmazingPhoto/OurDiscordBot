@@ -1,52 +1,64 @@
 # OurDiscordBot
 
-A minimal Discord bot starter that demonstrates both a classic prefix command and a modern slash command. The project uses `discord.py`, loads secrets from environment variables, and is ready for deployment on platforms such as Railway.
+OurDiscordBot bridges Jira and Discord. A Flask webhook receiver accepts Jira events, converts them into rich Discord embeds, and delivers them through a long-lived `discord.py` client. The codebase now exposes clear factories for HTTP and Discord services, making it easy to extend with new events or integrations.
 
-## Features
-- `!ping` prefix command that replies with `pong!`
-- `/hello` slash command that greets the invoking user
-- Automatic slash command tree sync on startup
-- Loads `DISCORD_TOKEN` from environment variables (via `.env` locally)
-- Opt-in message content intent enabled for compatibility with prefix commands
+## Highlights
+- **Modular runtime** - `ourdiscordbot.runtime.build_runtime()` wires up settings, Flask app, and Discord client without side effects. The executable entry point (`python bot.py`) simply calls `run_bot()`.
+- **Typed settings** - `ourdiscordbot.settings.Settings` loads environment variables, validates mandatory secrets, and centralises the listening port.
+- **Webhook pipeline** - `ourdiscordbot.http_app.create_flask_app()` verifies the shared secret, logs payloads for observability, and defers formatting to `ourdiscordbot.jira_handler.process_jira_event`.
+- **Discord notifier** - `ourdiscordbot.discord_client.DiscordNotifier` encapsulates outbound messaging and keeps health-check handlers close to the client.
+- **Event architecture** - Jira events register via `jira_events.registry`. Handlers (e.g. `jira_events.assignee_changed`) render embeds, while classifiers break down `"jira:issue_updated"` into specific intents.
+- **Status transitions** - `jira_events.status_transition` now formats embeds that show the previous and new status, the actor, and a relative timestamp.
+- **Tests** - `pytest` suites exercise webhook behaviour, runtime dispatch, and embed formatting to prevent regressions.
 
-## Requirements
-- Python 3.10+
-- `discord.py`, `python-dotenv`, `requests` (installed from `requirements.txt`)
-- A Discord bot application with the **Message Content Intent** enabled
-
-## Local Setup
-1. Create a virtual environment:
+## Getting Started
+1. **Create a virtual environment**
    ```powershell
    python -m venv .venv
    .venv\Scripts\activate
    ```
-2. Install dependencies:
+
+2. **Install dependencies**
    ```powershell
    pip install -r requirements.txt
    ```
-3. Create a `.env` file (not committed to git) and add your bot token:
-   ```env
-   DISCORD_TOKEN=your-bot-token-here
+
+3. **Set mandatory environment variables**
+   ```powershell
+   $env:DISCORD_BOT_TOKEN="your-discord-token"
+   $env:DISCORD_CHANNEL_ID="123456789012345678"
+   $env:JIRA_WEBHOOK_SECRET="super-secret"
+   # optional
+   $env:PORT="8080"
    ```
-4. Run the bot:
+
+4. **Run locally**
    ```powershell
    python bot.py
    ```
-5. Invite the bot to a server using the OAuth2 URL from the Discord Developer Portal (include the `applications.commands` scope to use slash commands).
+   The bot starts the Flask webhook server in a background thread and then connects to Discord. Use `http://localhost:8080/health` to verify the HTTP side.
 
-## Slash Commands
-- On the first startup the bot syncs the slash command definition with Discord. This can take up to a minute before the command appears in your server.
-- Slash command code lives in `bot.py` under `@bot.tree.command`. Add additional commands there and call `await bot.tree.sync()` after modifying them.
+5. **Execute tests**
+   ```powershell
+   python -m pytest
+   ```
 
-## Deployment (Railway example)
-1. Push the repository to GitHub (omit `.env`, already ignored).
-2. Create a new Railway project and connect the repository.
-3. Set the environment variable `DISCORD_TOKEN` in the Railway dashboard.
-4. Deploy; Railway boots the container and the bot logs in using the provided token.
+## Deploying
+1. Push the repository to your hosting provider (Railway, Fly.io, etc.).
+2. Configure the same environment variables in your hosting dashboard.
+3. Expose HTTPS traffic to `/webhooks/jira`.
+4. Point Jira Automation to `https://<public-host>/webhooks/jira?secret=<JIRA_WEBHOOK_SECRET>`.
+
+## Extending Jira Events
+1. Create a new module under `jira_events/` and implement `register()`, `handle_*`, and optional classifiers.
+2. Import the module in `jira_events/__init__.py` and call its `register()` function.
+3. Add test cases under `tests/` that cover both classification and embed rendering.
+4. Update documentation where appropriate (see `docs/JiraEventHandlingArchitecture.md` for the reference architecture).
 
 ## Troubleshooting
-- **Missing DISCORD_TOKEN environment variable**: ensure the variable is set in `.env` locally or in your hosting provider's environment settings.
-- **Message content warning**: verify Message Content Intent is enabled in the Discord Developer Portal for the bot.
+- 403 responses usually mean the `secret` query parameter does not match `JIRA_WEBHOOK_SECRET`.
+- If Discord receives no message, confirm the bot has cached the target channel and that `DISCORD_CHANNEL_ID` is a valid integer.
+- Run `python -m pytest` before committing to ensure parser and classifier changes remain compatible.
 
 ## License
-This project is released under the [MIT License](LICENSE).
+This project remains under the [MIT License](LICENSE).
