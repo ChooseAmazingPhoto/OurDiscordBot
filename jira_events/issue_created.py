@@ -65,13 +65,9 @@ def handle_issue_created(data: dict) -> Optional[discord.Embed]:
             name="Assignee", value=_safe_text(assignee or "Unassigned"), inline=True
         )
 
-        labels = fields.get("labels") or []
+        labels = _normalize_labels(fields.get("labels"))
         if labels:
-            embed.add_field(
-                name="Labels",
-                value=", ".join(_safe_text(label) for label in labels[:10]),
-                inline=False,
-            )
+            embed.add_field(name="Labels", value=labels, inline=False)
 
         created_timestamp = fields.get("created")
         parsed_timestamp = parse_jira_datetime(created_timestamp)
@@ -97,13 +93,14 @@ def _format_summary(summary: str) -> str:
     return f"> {text}"
 
 
-def _format_user(user_info: dict) -> Optional[str]:
-    if not isinstance(user_info, dict):
-        return None
-    for key in ("displayName", "nickname", "name", "emailAddress"):
-        value = user_info.get(key)
-        if value:
-            return escape_markdown(str(value))
+def _format_user(user_info) -> Optional[str]:
+    if isinstance(user_info, str):
+        return escape_markdown(user_info)
+    if isinstance(user_info, dict):
+        for key in ("displayName", "nickname", "name", "emailAddress"):
+            value = user_info.get(key)
+            if value:
+                return escape_markdown(str(value))
     return None
 
 
@@ -123,3 +120,19 @@ def _color_from_priority(priority: str) -> discord.Color:
         "lowest": discord.Color.from_rgb(79, 70, 229),
     }
     return palette.get(normalized, discord.Color.blurple())
+
+
+def _normalize_labels(raw_labels) -> Optional[str]:
+    if not raw_labels:
+        return None
+    if isinstance(raw_labels, str):
+        parts = [label.strip() for label in raw_labels.split(",") if label.strip()]
+    elif isinstance(raw_labels, (list, tuple, set)):
+        parts = [str(label).strip() for label in raw_labels if str(label).strip()]
+    else:
+        return None
+
+    if not parts:
+        return None
+
+    return ", ".join(escape_markdown(part) for part in parts[:10])

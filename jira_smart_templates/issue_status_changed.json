@@ -1,0 +1,59 @@
+{
+  "webhookEvent": "{{webhookEvent}}",
+  "timestamp": "{{webhookEventCreated}}",
+  "user": {
+    "displayName": "{{user.displayName}}",
+    "accountId": "{{user.accountId}}"
+  },
+  "changelog": "{{changelog}}",
+  "issue": {
+    "self": "{{issue.self}}",
+    "id": "{{issue.id}}",
+    "key": "{{issue.key}}",
+    "fields": {
+      "summary": "{{issue.fields.summary}}",
+      "status": {
+        "name": "{{issue.fields.status.name}}"
+      },
+      "priority": {
+        "name": "{{issue.fields.priority.name}}"
+      },
+      "project": {
+        "name": "{{issue.fields.project.name}}"
+      },
+      "issuetype": {
+        "name": "{{issue.fields.issuetype.name}}"
+      },
+      "assignee": {
+        "displayName": "{{issue.fields.assignee.displayName}}"
+      },
+      "reporter": {
+        "displayName": "{{issue.fields.reporter.displayName}}"
+      },
+      "labels": "{{issue.fields.labels.join(\", \")}}"
+    }
+  },
+  "discordTemplate": {
+    "title": "[{{issue.key}}] Status Updated",
+    "url": "{{issue.url}}",
+    "description": "{{issue.fields.summary}}",
+    "fields": [
+      {
+        "name": "From",
+        "value": "{{fieldChange.fromString}}",
+        "inline": true
+      },
+      {
+        "name": "To",
+        "value": "{{fieldChange.toString}}",
+        "inline": true
+      },
+      {
+        "name": "Changed by",
+        "value": "{{user.displayName}}",
+        "inline": true
+      }
+    ],
+    "footer": "Priority: {{issue.fields.priority.name}} • Assignee: {{issue.fields.assignee.displayName}}"
+  }
+}

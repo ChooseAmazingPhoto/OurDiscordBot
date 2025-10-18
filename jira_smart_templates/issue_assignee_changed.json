@@ -1,0 +1,59 @@
+{
+  "webhookEvent": "{{webhookEvent}}",
+  "timestamp": "{{webhookEventCreated}}",
+  "user": {
+    "displayName": "{{user.displayName}}",
+    "accountId": "{{user.accountId}}"
+  },
+  "changelog": "{{changelog}}",
+  "issue": {
+    "self": "{{issue.self}}",
+    "id": "{{issue.id}}",
+    "key": "{{issue.key}}",
+    "fields": {
+      "summary": "{{issue.fields.summary}}",
+      "status": {
+        "name": "{{issue.fields.status.name}}"
+      },
+      "priority": {
+        "name": "{{issue.fields.priority.name}}"
+      },
+      "project": {
+        "name": "{{issue.fields.project.name}}"
+      },
+      "issuetype": {
+        "name": "{{issue.fields.issuetype.name}}"
+      },
+      "assignee": {
+        "displayName": "{{issue.fields.assignee.displayName}}",
+        "accountId": "{{issue.fields.assignee.accountId}}"
+      },
+      "reporter": {
+        "displayName": "{{issue.fields.reporter.displayName}}"
+      }
+    }
+  },
+  "discordTemplate": {
+    "title": "[{{issue.key}}] Assignee Updated",
+    "url": "{{issue.url}}",
+    "description": "{{issue.fields.summary}}",
+    "fields": [
+      {
+        "name": "Previous assignee",
+        "value": "{{fieldChange.fromString}}",
+        "inline": true
+      },
+      {
+        "name": "New assignee",
+        "value": "{{fieldChange.toString}}",
+        "inline": true
+      },
+      {
+        "name": "Updated by",
+        "value": "{{user.displayName}}",
+        "inline": true
+      }
+    ],
+    "footer": "Priority: {{issue.fields.priority.name}} • Status: {{issue.fields.status.name}}"
+  }
+}
