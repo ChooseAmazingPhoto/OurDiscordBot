@@ -69,7 +69,5 @@ def handle_issue_created(data: dict) -> Optional[discord.Embed]:
         return embed
 
     except KeyError as exc:
-        logger.error(
-            "Error parsing Jira 'issue_created' payload: Missing key %s", exc
-        )
+        logger.error("Error parsing Jira 'issue_created' payload: Missing key %s", exc)
         return None

@@ -30,7 +30,11 @@ def parse_jira_datetime(raw_value) -> Optional[datetime]:
 
         if candidate.endswith("Z"):
             candidate = candidate[:-1] + "+00:00"
-        if len(candidate) > 5 and candidate[-5] in ("+", "-") and candidate[-4:].isdigit():
+        if (
+            len(candidate) > 5
+            and candidate[-5] in ("+", "-")
+            and candidate[-4:].isdigit()
+        ):
             candidate = f"{candidate[:-5]}{candidate[-5:-2]}:{candidate[-2:]}"
 
         try:

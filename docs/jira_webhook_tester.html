@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Jira → Discord Webhook Tester</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        background: #0f172a;
+        color: #f8fafc;
+        min-height: 100vh;
+      }
+
+      h1,
+      h2 {
+        margin-top: 0;
+      }
+
+      .card {
+        max-width: 960px;
+        margin: 0 auto;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.4);
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-weight: 600;
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+        padding: 0.65rem 0.75rem;
+        margin-bottom: 1rem;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: rgba(15, 23, 42, 0.6);
+        color: inherit;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 220px;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: 2px solid rgba(94, 234, 212, 0.6);
+        border-color: transparent;
+      }
+
+      button {
+        background: linear-gradient(135deg, #38bdf8, #6366f1);
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 0;
+        transition: transform 0.1s ease-in-out;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .inline-controls {
+        display: grid;
+        gap: 1rem;
+      }
+
+      @media (min-width: 640px) {
+        .inline-controls {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      .status {
+        margin-top: 1.25rem;
+        padding: 1rem;
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.65);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+      }
+
+      .status h3 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1rem;
+      }
+
+      .divider {
+        border: none;
+        height: 1px;
+        background: rgba(148, 163, 184, 0.3);
+        margin: 1.5rem 0;
+      }
+
+      code {
+        font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono",
+          Menlo, monospace;
+        padding: 0.25rem 0.4rem;
+        background: rgba(15, 23, 42, 0.6);
+        border-radius: 6px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Jira → Discord Webhook Tester</h1>
+      <p>
+        這個頁面用來手動送出 Jira Webhook Payload，確認 Railway 上的
+        Discord Bot 是否能順利收到並推送通知。
+      </p>
+
+      <hr class="divider" />
+
+      <section>
+        <h2>Webhook 設定</h2>
+
+        <label for="webhookBaseUrl">Railway Base URL</label>
+        <input
+          id="webhookBaseUrl"
+          type="url"
+          placeholder="https://your-app.up.railway.app"
+          required
+        />
+
+        <label for="secret">Webhook Secret</label>
+        <input id="secret" type="text" placeholder="my-super-secret" />
+
+        <div class="inline-controls">
+          <div>
+            <label for="eventType">Event Type</label>
+            <select id="eventType">
+              <option value="jira:issue_created">jira:issue_created</option>
+              <option value="jira:issue_status_changed">
+                jira:issue_status_changed
+              </option>
+              <option value="jira:issue_assignee_changed">
+                jira:issue_assignee_changed
+              </option>
+              <option value="jira:issue_due_date_changed">
+                jira:issue_due_date_changed
+              </option>
+              <option value="comment_created">comment_created</option>
+              <option value="jira:issue_reopened">jira:issue_reopened</option>
+              <option value="jira:issue_labels_changed">
+                jira:issue_labels_changed
+              </option>
+              <option value="jira:issue_updated">jira:issue_updated</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="issueKey">Issue Key</label>
+            <input id="issueKey" type="text" placeholder="DCBOT-30" />
+          </div>
+        </div>
+
+        <label for="summary">Summary</label>
+        <input
+          id="summary"
+          type="text"
+          placeholder="Testing Discord notification pipeline"
+        />
+      </section>
+
+      <hr class="divider" />
+
+      <section>
+        <h2>Payload</h2>
+        <p>
+          可以直接編輯下方 JSON 內容。上方欄位變更後可按
+          <code>Rebuild Payload</code> 重建預設內容。
+        </p>
+
+        <textarea id="payload" spellcheck="false"></textarea>
+
+        <div class="inline-controls">
+          <button type="button" id="rebuild">Rebuild Payload</button>
+          <button type="button" id="send">Send to Railway</button>
+        </div>
+      </section>
+
+      <div class="status" id="statusPanel" hidden>
+        <h3>Result</h3>
+        <pre id="statusMessage"></pre>
+      </div>
+    </div>
+
+    <script>
+      const defaultPayload = () => ({
+        webhookEvent: document.getElementById("eventType").value,
+        issue: {
+          self: "https://example.atlassian.net/rest/api/2/issue/12345",
+          key: document.getElementById("issueKey").value || "DCBOT-30",
+          fields: {
+            summary:
+              document.getElementById("summary").value ||
+              "Testing Discord notification pipeline",
+            reporter: { displayName: "Webhook Tester" },
+            issuetype: { name: "Task" },
+            priority: { name: "Medium" },
+            project: { name: "Discord Bot" },
+            created: new Date().toISOString(),
+          },
+        },
+      });
+
+      const payloadTextarea = document.getElementById("payload");
+      const rebuildButton = document.getElementById("rebuild");
+      const sendButton = document.getElementById("send");
+      const statusPanel = document.getElementById("statusPanel");
+      const statusMessage = document.getElementById("statusMessage");
+
+      function rebuildPayload() {
+        const data = defaultPayload();
+        payloadTextarea.value = JSON.stringify(data, null, 2);
+      }
+
+      async function sendPayload() {
+        const baseUrl = document
+          .getElementById("webhookBaseUrl")
+          .value.trim()
+          .replace(/\/$/, "");
+
+        if (!baseUrl) {
+          alert("請填寫 Railway Base URL");
+          return;
+        }
+
+        let parsedPayload;
+        try {
+          parsedPayload = JSON.parse(payloadTextarea.value);
+        } catch (error) {
+          alert("Payload 不是有效的 JSON，請重新檢查。");
+          return;
+        }
+
+        const secret = document.getElementById("secret").value.trim();
+        const url = new URL(baseUrl + "/webhooks/jira");
+        if (secret) {
+          url.searchParams.set("secret", secret);
+        }
+
+        sendButton.disabled = true;
+        statusPanel.hidden = true;
+
+        try {
+          const response = await fetch(url.toString(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(parsedPayload),
+          });
+
+          const text = await response.text();
+
+          statusMessage.textContent = [
+            `Request URL: ${url.toString()}`,
+            `Status: ${response.status} ${response.statusText}`,
+            "",
+            text || "<no body>",
+          ].join("\n");
+        } catch (error) {
+          statusMessage.textContent = `Request failed: ${error}`;
+        } finally {
+          statusPanel.hidden = false;
+          sendButton.disabled = false;
+        }
+      }
+
+      rebuildButton.addEventListener("click", rebuildPayload);
+      sendButton.addEventListener("click", sendPayload);
+
+      rebuildPayload();
+    </script>
+  </body>
+</html>
