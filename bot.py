@@ -99,6 +99,18 @@ def send_discord_message(content=None, embed=None):
             print(
                 f"Error: Cannot find channel with ID {channel_id}. Make sure the bot is in that channel."
             )
+            if bot.guilds:
+                print("Currently cached guilds and text channels:")
+                for guild in bot.guilds:
+                    print(f"- Guild '{guild.name}' ({guild.id})")
+                    text_channels = getattr(guild, "text_channels", [])
+                    if text_channels:
+                        for text_channel in text_channels:
+                            print(f"    • #{text_channel.name} (ID: {text_channel.id})")
+                    else:
+                        print("    • No text channels cached.")
+            else:
+                print("Bot is not connected to any guilds yet or cache is empty.")
     except (ValueError, TypeError):
         print(
             f"Error: DISCORD_CHANNEL_ID '{DISCORD_CHANNEL_ID}' is not a valid integer."
