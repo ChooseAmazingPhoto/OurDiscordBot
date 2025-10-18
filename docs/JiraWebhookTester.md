@@ -1,43 +1,22 @@
-# Jira Webhook Tester 使用說明
+# Jira Webhook Tester Guide
 
-這個測試頁可以用來手動觸發 Railway 上的 Jira Webhook，確認 Discord Bot 的通知流程是否正常。
+The HTML tester (`docs/jira_webhook_tester.html`) simulates Jira Automation requests so you can validate the webhook locally or against a deployed instance.
 
-## 檔案位置
+## Usage
+1. Open the HTML file in a modern browser (no build step required).
+2. Enter your application base URL (e.g. `https://your-app.up.railway.app`). The tester appends `/webhooks/jira` automatically.
+3. Provide the webhook secret if your deployment requires it (recommended). This becomes the `secret` query parameter.
+4. Choose a canned event type and populate quick fields such as issue key and summary. Click **Rebuild Payload** to regenerate the JSON body.
+5. Inspect or edit the generated JSON. You can paste in real payloads from Jira if desired.
+6. Click **Send to Railway** (or your target base URL). The tool issues a `POST` request and prints the HTTP status code and body in the lower console.
 
-- 測試頁：`docs/jira_webhook_tester.html`
+## Troubleshooting
+- `403 Forbidden` - Verify that the provided secret matches the `JIRA_WEBHOOK_SECRET` configured on the server.
+- `400 Bad Request` - The payload is not valid JSON. Use a JSON formatter or copy a known working template from `jira_smart_templates/`.
+- No Discord notification - Confirm the bot is running, connected to the correct guild, and that `DISCORD_CHANNEL_ID` references a text channel the bot can access.
+- Browser network errors - The tester runs client-side. If CORS is disabled on the target environment, run the tester locally via `python -m http.server` and proxy traffic through a tool like `ngrok`.
 
-將檔案直接用瀏覽器打開即可（雙擊或拖曳到瀏覽器分頁）。不需要額外的建置或伺服器。
-
-## 操作步驟
-
-1. **填寫 Railway Base URL**
-   - 請輸入 Railway 部署的網域，例如 `https://your-app.up.railway.app`。
-   - 程式會自動在後面加上 `/webhooks/jira`。
-
-2. **輸入 Webhook Secret（若有）**
-   - 與 `.env` 或 Railway 環境變數的 `JIRA_WEBHOOK_SECRET` 一致。
-   - 留空則直接打 webhook，不會帶 `secret` query。
-
-3. **挑選事件與基本欄位**
-   - `Event Type` 提供常見事件的選單。
-   - `Issue Key`、`Summary` 會帶入至預設 payload。
-
-4. **檢視與編輯 JSON Payload**
-   - 下方文字框會顯示送出的 JSON，必要時可手動編輯。
-   - 若修改了上方欄位，可按 `Rebuild Payload` 重建預設內容。
-
-5. **送出請求**
-   - 按 `Send to Railway` 後會送 `POST` 到 `/webhooks/jira?secret=...`。
-   - 右下角會顯示 Response 的狀態碼與文字內容。
-   - 成功時，記得到 Discord 指定頻道確認是否有收到 Embed。
-
-## 排錯建議
-
-- 先用 `curl` 或 Postman 驗證 webhook 是否可達，再用網頁測試。
-- 如果顯示 403，確認 secret 是否正確。
-- 若收到 200 但 Discord 沒通知，檢查 bot 是否正在運行、環境變數是否設定。
-- `payload` 欄位可貼上真實 Jira Webhook JSON 做重現測試。
-
-## 後續擴充
-
-可依需求新增更多事件範本、payload 欄位或將測試頁部署在內部工具站供團隊使用。也可以搭配瀏覽器的 Network 面板觀察詳細請求資訊。***
+## Tips
+- Keep a library of sample payloads for different Jira events. You can build them from the templates in `jira_smart_templates/`.
+- When testing locally, start the bot (`python bot.py`) and watch the terminal logs for immediate feedback.
+- Use the developer tools Network tab to inspect request and response headers if the tester output is insufficient.

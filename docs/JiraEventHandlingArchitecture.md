@@ -1,63 +1,78 @@
-# Jira Webhook 處理架構簡介
+# Jira Event Handling Architecture
 
-## 緣起
+This document explains how Jira webhook payloads move through the codebase and reach Discord.
 
-隨著 Discord Bot 需要支援愈來愈多 Jira 任務事件（任務建立、狀態轉移、指派變更、到期日調整、評論新增、重開、標籤變更等），舊版僅用條件判斷處理的寫法將難以維護。為了讓新事件可以快速接入，我們把事件處理流程抽象化成「事件註冊 → 類型判斷 → Discord Embed 格式化」三個階段，並提供可插拔的 handler 與 classifier 模式。
-
-## 架構總覽
+## Runtime Overview
 
 ```
-Flask Webhook
+Settings.from_env()
       │
       ▼
-process_jira_event(data)
-      │
-      ├─ _determine_event_type(data)
-      │       ├─ 直接讀 payload 中的事件欄位
-      │       └─ 透過 classifier 細分 jira:issue_updated
-      │
-      └─ registry.dispatch(event_type, data)
-              └─ 導向對應的 handler 模組
+create_bot() ──> Discord Client ──> DiscordNotifier.send()
+      │                               ▲
+      │                               │
+      └────── create_flask_app() ─────┘
+                      │
+                      ▼
+              /webhooks/jira (Flask)
+                      │
+                      ▼
+        ourdiscordbot.jira_handler.process_jira_event()
+                      │
+                      ▼
+           jira_events.registry.dispatch()
+                      │
+                      ▼
+     Event handler (e.g. assignee_changed.handle_assignee_changed)
+                      │
+                      ▼
+                discord.Embed message
 ```
 
-### 核心元件
+### Key Modules
 
-- `jira_handler.process_jira_event`：單一入口，負責推論事件類型並呼叫註冊的 handler。
-- `jira_events.registry`：保存事件字串與 handler 的對應關係，並自動處理 handler 是否需要 `event_type` 參數。
-- `jira_events.classifiers`：管理更新類事件（如 assignee 變更、標籤變動）的判斷函式，以細分 `jira:issue_updated`。
-- `jira_events/common.py`：共用工具（時間解析、Issue URL 建立等）。
+| Module | Responsibility |
+| --- | --- |
+| `ourdiscordbot/settings.py` | Loads `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID`, `JIRA_WEBHOOK_SECRET`, and optional `PORT`. |
+| `ourdiscordbot/discord_client.py` | Creates the `discord.Client`, registers `!health`, and exposes `DiscordNotifier.send()`. |
+| `ourdiscordbot/http_app.py` | Builds the Flask app, validates the shared secret, logs payloads, and forwards data to the Jira handler. |
+| `ourdiscordbot/runtime.py` | Wires settings, client, notifier, and app. `run_bot()` launches Flask in a background thread and then blocks on `discord.Client.run()`. |
+| `ourdiscordbot/jira_handler.py` | Infers the event type, routes `"jira:issue_updated"` payloads through classifiers, and dispatches registered handlers. |
+| `jira_events/*` | Per-event handlers and classifiers that transform payloads into Discord embeds. |
+| `tests/*` | Pytest suites covering HTTP endpoints, event dispatch, and embed formatting. |
 
-## 事件模組
+## Webhook Flow
 
-每個事件都有獨立模組負責：
+1. **Request arrives** at `POST /webhooks/jira?secret=...`. The Flask route immediately rejects calls with missing or mismatched secrets.
+2. **Payload is parsed** and logged. Invalid JSON triggers a `400` response.
+3. **Event type resolution** happens inside `ourdiscordbot.jira_handler.process_jira_event()`. The helper `_determine_event_type()` inspects `webhookEvent`, `issue_event_type_name`, etc. For `"jira:issue_updated"` the registry runs each classifier until a specific event (e.g. assignee change, status transition) is identified.
+4. **Dispatch** uses `jira_events.registry.JiraEventRegistry`, which understands handler signatures and supplies the inferred `event_type` when required.
+5. **Handler execution** builds a `discord.Embed`. Handlers add summary fields, timestamps, and colours that make the update actionable. Returning `None` means “ignore this event”.
+6. **Delivery** happens through `DiscordNotifier.send()`, which schedules `channel.send(...)` on the Discord client's event loop.
 
-| 事件類型 | 模組 | 目前狀態 |
-| --- | --- | --- |
-| 任務建立 | `jira_events/issue_created.py` | handler 已產出 Embed |
-| 狀態轉移 | `jira_events/status_transition.py` | 預留 handler 與 classifier |
-| 指派變更 | `jira_events/assignee_changed.py` | 預留 handler 與 classifier |
-| 到期日變更 | `jira_events/due_date_changed.py` | 預留 handler 與 classifier |
-| 評論新增 | `jira_events/comment_created.py` | 預留 handler |
-| 任務重開 | `jira_events/issue_reopened.py` | 預留 handler 與 classifier |
-| 標籤變更 | `jira_events/labels_updated.py` | 預留 handler 與 classifier |
+## Adding a New Jira Event
 
-在 `jira_events/__init__.py` 會統一呼叫各模組的 `register()`，自動把事件類型與 classifier 掛入系統。
+1. Create a module under `jira_events/` (for example `due_date_changed.py`).
+2. Implement a `register(registry, register_classifier=None)` function that adds the handler (and optional classifier) to the registry.
+3. Write the handler so it returns either a populated `discord.Embed` or `None`.
+4. Optionally register a classifier that inspects `data["changelog"]` to narrow `"jira:issue_updated"` payloads.
+5. Import the module in `jira_events/__init__.py` and call `register(...)`.
+6. Add regression tests under `tests/` that cover both dispatch and embed output.
 
-## 擴充流程
+## Formatting Guidance
 
-1. **建立模組**：在 `jira_events/` 底下新增檔案，提供 `register(registry, register_classifier)` 函式。
-2. **註冊事件**：在 `register()` 中呼叫 `registry.register([...], handler)`，必要時註冊 classifier。
-3. **實作 handler**：撰寫 `handle_xxx(data, event_type=None)`，回傳 `discord.Embed` 或 `None`。
-4. **撰寫 classifier（選擇性）**：若要細分更新事件，實作 `classify_xxx(data)`，判斷 changelog 後回傳事件字串。
-5. **註冊模組**：於 `jira_events/__init__.py` 引入新模組並呼叫 `register()`。
-6. **新增測試**：在 `tests/test_jira_handler.py` 或專屬測試檔撰寫測試案例。
+- Escape user-provided strings with `discord.utils.escape_markdown`.
+- Reuse helpers in `jira_events/common.py` for timestamps and URLs.
+- Focus embed fields on actionable data (status, assignee, priority, reporter, labels).
+- Set `embed.timestamp` and pair it with `format_dt(..., "R")` in the footer for relative timing.
+- Provide fallbacks such as `"Unassigned"` or `"Unknown"` when Jira omits fields.
 
-## 未來工作
+## Testing Strategy
 
-- 實作各事件的 classifier 與 handler，讓通知內容更貼近實際需求。
-- 規劃 Embed 樣板與統一的樣式（顏色、欄位順序等）。
-- 考慮將事件記錄與通知整合到 Bot 指令中，提供查詢或重送功能。
+- `tests/test_bot.py` exercises the Flask webhook, shared-secret enforcement, and JSON parsing while mocking outbound Discord traffic.
+- `tests/test_jira_handler.py` verifies registry dispatch as well as embed formatting for issue creation, assignee changes, and status transitions.
+- When introducing new handlers, add tests for both the happy path and edge cases (missing changelog data, unexpected field shapes).
 
----
+## Jira Smart Templates
 
-若要快速了解現況，請先閱讀 `jira_handler.py` 與 `jira_events/` 內各模組，再依需求補齊對應事件的處理邏輯。這套結構讓新增事件只需聚焦在該事件的解析與呈現，不需重新改動核心路由器。
+The `jira_smart_templates/` directory contains reference JSON bodies for Jira Automation. While handlers currently render embeds directly in Python, the templates remain useful when configuring Automation rules or planning template-driven rendering in future iterations.

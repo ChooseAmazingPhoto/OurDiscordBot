@@ -1,11 +1,20 @@
 {
   "webhookEvent": "{{webhookEvent}}",
-  "timestamp": "{{webhookEventCreated}}",
+  "webhookEventCreated": "{{now}}",
   "user": {
     "displayName": "{{user.displayName}}",
     "accountId": "{{user.accountId}}"
   },
-  "changelog": "{{changelog}}",
+  "changelog": {
+    "created": "{{changelog.created}}",
+    "items": [
+      {
+        "field": "status",
+        "fromString": "{{changelog.items.first.fromString}}",
+        "toString": "{{changelog.items.first.toString}}"
+      }
+    ]
+  },
   "issue": {
     "self": "{{issue.self}}",
     "id": "{{issue.id}}",
@@ -54,6 +63,6 @@
         "inline": true
       }
     ],
-    "footer": "Priority: {{issue.fields.priority.name}} • Assignee: {{issue.fields.assignee.displayName}}"
+    "footer": "Priority: {{issue.fields.priority.name}} | Assignee: {{issue.fields.assignee.displayName}}"
   }
 }

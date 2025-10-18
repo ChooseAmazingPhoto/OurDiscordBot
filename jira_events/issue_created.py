@@ -106,7 +106,7 @@ def _format_user(user_info) -> Optional[str]:
 
 def _safe_text(value: Optional[str]) -> str:
     if not value:
-        return "—"
+        return "--"
     return escape_markdown(str(value))
 
 
