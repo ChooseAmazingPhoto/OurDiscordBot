@@ -1,69 +1,92 @@
+import logging
+from typing import Optional
+
 import discord
-from datetime import datetime
+
+from jira_events import classify_issue_update, registry
+
+logger = logging.getLogger(__name__)
 
 
-def process_jira_event(data):
+def process_jira_event(data: dict) -> Optional[discord.Embed]:
     """
     Routes the Jira webhook payload to the appropriate formatting function
-    based on the event type.
+    based on the inferred event type.
     """
-    event_type = data.get("webhookEvent")
+    event_type = _determine_event_type(data)
+    if not event_type:
+        logger.info("Ignoring unhandled Jira event: None")
+        return None
 
-    if event_type == "jira:issue_created":
-        return format_issue_created_embed(data)
-    # --- Future event handlers will go here ---
-    # elif event_type == 'jira:issue_updated':
-    #     return format_issue_updated_embed(data)
-    # elif event_type == 'comment_created':
-    #     return format_comment_created_embed(data)
+    embed = registry.dispatch(event_type, data)
+    if embed:
+        return embed
 
-    # Return None if the event is not one we handle
-    print(f"Ignoring unhandled Jira event: {event_type}")
+    logger.info(
+        "Ignoring unhandled Jira event: %s (registered events: %s)",
+        event_type,
+        ", ".join(registry.known_events()) or "none",
+    )
     return None
 
 
-def format_issue_created_embed(data):
+def _determine_event_type(data):
     """
-    Formats a Discord Embed for a 'jira:issue_created' event.
+    Attempts to determine the Jira event type from varying webhook payloads.
     """
-    try:
-        issue = data["issue"]
-        issue_key = issue["key"]
-        summary = issue["fields"]["summary"]
-        reporter = issue["fields"]["reporter"]["displayName"]
-        issue_type = issue["fields"]["issuetype"]["name"]
-        priority = issue["fields"]["priority"]["name"]
-
-        # Construct the user-friendly issue URL from the API 'self' link
-        base_url = issue["self"].split("/rest/api")[0]
-        issue_url = f"{base_url}/browse/{issue_key}"
-
-        embed = discord.Embed(
-            title=f"[{issue_key}] New Issue Created",
-            description=summary,
-            url=issue_url,
-            color=discord.Color.green(),  # Green for new items
-        )
-
-        embed.add_field(name="Type", value=issue_type, inline=True)
-        embed.add_field(name="Priority", value=priority, inline=True)
-        embed.add_field(name="Reporter", value=reporter, inline=False)
-
-        # Try to parse the timestamp and add it
-        try:
-            created_timestamp = issue["fields"]["created"]
-            # Timestamps from Jira are in ISO 8601 format, e.g., '2023-10-27T05:26:31.230+0000'
-            # discord.py's fromisoformat doesn't handle the timezone offset well, so we split it.
-            embed.timestamp = datetime.fromisoformat(created_timestamp.split(".")[0])
-        except Exception as e:
-            print(f"Could not parse timestamp: {e}")
-
-        # Set a footer with the project name
-        project_name = issue["fields"]["project"]["name"]
-        embed.set_footer(text=f"Project: {project_name}")
-
-        return embed
-
-    except KeyError as e:
-        print(f"Error parsing Jira 'issue_created' payload: Missing key {e}")
+    if not isinstance(data, dict):
         return None
+
+    event_keys = (
+        "webhookEvent",
+        "issue_event_type_name",
+        "event_type",
+        "eventType",
+    )
+
+    for key in event_keys:
+        if key in data and data[key]:
+            normalized = _normalize_event_type(key, data[key])
+            if normalized == "jira:issue_updated":
+                specific = classify_issue_update(data)
+                return specific or normalized
+            return normalized
+
+    if "comment" in data:
+        return "comment_created"
+
+    issue = data.get("issue")
+    if issue:
+        changelog = data.get("changelog") or issue.get("changelog")
+        if changelog:
+            specific = classify_issue_update(data)
+            if specific:
+                return specific
+
+            histories = changelog.get("histories") or []
+            total = changelog.get("total")
+            if histories or (isinstance(total, int) and total > 0):
+                return "jira:issue_updated"
+        return "jira:issue_created"
+
+    return None
+
+
+def _normalize_event_type(source_key, value):
+    """
+    Normalizes different representations of event type values.
+    """
+    if not isinstance(value, str):
+        return None
+
+    event_type = value.strip()
+    if not event_type:
+        return None
+
+    lowered = event_type.lower()
+
+    if source_key == "issue_event_type_name" and not lowered.startswith("jira:"):
+        if lowered.startswith("issue_"):
+            return f"jira:{lowered}"
+
+    return lowered
