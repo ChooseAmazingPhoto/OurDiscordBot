@@ -1,0 +1,57 @@
+{
+  "webhookEvent": "{{webhookEvent}}",
+  "repository": {
+    "name": "{{repository.name}}",
+    "links": {
+      "html": {
+        "href": "{{repository.links.html.href}}"
+      }
+    }
+  },
+  "pullrequest": {
+    "id": "{{pullrequest.id}}",
+    "title": "{{pullrequest.title}}",
+    "description": "{{pullrequest.description}}",
+    "author": {
+      "display_name": "{{pullrequest.author.display_name}}"
+    },
+    "source": {
+      "branch": {
+        "name": "{{pullrequest.source.branch.name}}"
+      }
+    },
+    "destination": {
+      "branch": {
+        "name": "{{pullrequest.destination.branch.name}}"
+      }
+    },
+    "links": {
+      "html": {
+        "href": "{{pullrequest.links.html.href}}"
+      }
+    }
+  },
+  "discordTemplate": {
+    "title": "{{pullrequest.title}}",
+    "url": "{{pullrequest.links.html.href}}",
+    "description": "{{pullrequest.description}}",
+    "fields": [
+      {
+        "name": "Author",
+        "value": "{{pullrequest.author.display_name}}",
+        "inline": true
+      },
+      {
+        "name": "Source",
+        "value": "{{pullrequest.source.branch.name}}",
+        "inline": true
+      },
+      {
+        "name": "Destination",
+        "value": "{{pullrequest.destination.branch.name}}",
+        "inline": true
+      }
+    ],
+    "footer": "{{repository.name}}"
+  }
+}

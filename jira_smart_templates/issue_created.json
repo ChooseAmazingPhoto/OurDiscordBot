@@ -1,0 +1,64 @@
+{
+  "webhookEvent": "{{webhookEvent}}",
+  "timestamp": "{{webhookEventCreated}}",
+  "issue": {
+    "self": "{{issue.self}}",
+    "id": "{{issue.id}}",
+    "key": "{{issue.key}}",
+    "fields": {
+      "summary": "{{issue.fields.summary}}",
+      "description": "{{issue.fields.description}}",
+      "reporter": {
+        "displayName": "{{issue.fields.reporter.displayName}}",
+        "accountId": "{{issue.fields.reporter.accountId}}"
+      },
+      "assignee": {
+        "displayName": "{{issue.fields.assignee.displayName}}",
+        "accountId": "{{issue.fields.assignee.accountId}}"
+      },
+      "issuetype": {
+        "name": "{{issue.fields.issuetype.name}}"
+      },
+      "status": {
+        "name": "{{issue.fields.status.name}}"
+      },
+      "priority": {
+        "name": "{{issue.fields.priority.name}}"
+      },
+      "project": {
+        "key": "{{issue.fields.project.key}}",
+        "name": "{{issue.fields.project.name}}"
+      },
+      "labels": "{{issue.fields.labels.join(\", \")}}",
+      "created": "{{issue.fields.created}}"
+    }
+  },
+  "discordTemplate": {
+    "title": "[{{issue.key}}] {{issue.fields.summary}}",
+    "url": "{{issue.url}}",
+    "description": "{{issue.fields.description}}",
+    "fields": [
+      {
+        "name": "Priority",
+        "value": "{{issue.fields.priority.name}}",
+        "inline": true
+      },
+      {
+        "name": "Status",
+        "value": "{{issue.fields.status.name}}",
+        "inline": true
+      },
+      {
+        "name": "Reporter",
+        "value": "{{issue.fields.reporter.displayName}}",
+        "inline": true
+      },
+      {
+        "name": "Assignee",
+        "value": "{{issue.fields.assignee.displayName}}",
+        "inline": true
+      }
+    ],
+    "footer": "Project: {{issue.fields.project.name}} • Created {{issue.fields.created}}"
+  }
+}
