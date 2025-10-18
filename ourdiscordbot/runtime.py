@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 
 import discord
+
+if TYPE_CHECKING:
+    from flask import Flask
 
 from .discord_client import DiscordNotifier, create_bot
 from .http_app import create_flask_app
@@ -18,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def build_runtime(
     settings: Optional[Settings] = None,
-) -> Tuple[Settings, discord.Client, DiscordNotifier, "Flask"]:
+) -> Tuple[Settings, discord.Client, DiscordNotifier, Flask]:
     """Create settings, Discord client, notifier, and Flask app."""
     from flask import Flask  # Imported lazily to avoid eager dependency at import time
 
