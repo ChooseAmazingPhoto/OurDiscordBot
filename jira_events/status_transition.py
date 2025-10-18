@@ -102,6 +102,9 @@ def _extract_status_change(data: dict) -> Tuple[Optional[dict], Optional[dict]]:
     if not changelog:
         return None, None
 
+    if not isinstance(changelog, dict):
+        return None, None
+
     items = changelog.get("items")
     if isinstance(items, list):
         for item in items:
